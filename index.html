@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moral Switch — the trolley problem, judged by Jev</title>
+<meta name="description" content="An interactive trolley-problem laboratory. Jev, a fast decision model, delivers calibrated verdicts — probabilities, confidence and moral scores — via the Pollinations decisions API. Sign in with your own Pollen (BYOP); verdicts bill to you, not to anyone's key.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f5efe3'/%3E%3Cpath d='M4 24h24M4 24l14-14' stroke='%23b3402a' stroke-width='3' fill='none'/%3E%3Ccircle cx='18' cy='10' r='3' fill='%23b3402a'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap head-row">
+    <div>
+      <div class="wordmark">MORAL&nbsp;SWITCH</div>
+      <p class="tagline">The trolley problem, put to <strong>Jev</strong> — a decision model that answers with probabilities, not essays.</p>
+    </div>
+    <div class="auth-box" id="authBox">
+      <button id="signInBtn" class="btn btn-primary">Sign in with Pollen</button>
+      <p class="auth-note">Bring your own Pollen: you approve the budget on the consent screen, and every verdict bills to <em>your</em> balance. This app never sees or stores a secret key.</p>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="how" id="howStrip">
+    <p><strong>How it works.</strong> Pick a scenario — or write your own. Pull the lever (or don't). Between your finger and the lever stands Jev (<code>typesafe/jev-1.13</code> via <code>POST /alpha/decisions</code>), which judges the situation three ways at once: a <em>choice</em> with probabilities, a yes/no <em>conscience</em>, and a 0–100 <em>moral score</em>. You see how sure it is, and whether it flips when the options are reversed.</p>
+  </section>
+
+  <div class="grid">
+    <section class="panel" id="scenarioPanel">
+      <h2><span class="step">1</span> Choose a situation</h2>
+      <div class="scen-grid" id="scenGrid"></div>
+
+      <div id="dialWrap">
+        <h3>The dial</h3>
+        <div class="dial-row">
+          <label for="victimsMain">On the main track: <output id="victimsMainOut">5</output></label>
+          <input type="range" id="victimsMain" min="1" max="100" value="5">
+        </div>
+        <div class="dial-row">
+          <label for="victimsSide">On the side track: <output id="victimsSideOut">1</output></label>
+          <input type="range" id="victimsSide" min="1" max="100" value="1">
+        </div>
+        <div class="dial-row two-col">
+          <label>They are
+            <select id="relation">
+              <option value="strangers">strangers</option>
+              <option value="known">someone you know</option>
+              <option value="family">your family</option>
+              <option value="self">you yourself</option>
+            </select>
+          </label>
+          <label>You are
+            <select id="role">
+              <option value="bystander">a bystander at the switch</option>
+              <option value="driver">the trolley's driver</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div id="customWrap" hidden>
+        <h3>Your own dilemma</h3>
+        <label class="block-label" for="customState">The situation</label>
+        <textarea id="customState" rows="4" placeholder="A runaway trolley is heading toward five people. You could..."></textarea>
+        <label class="block-label" for="customAct">The act you are weighing</label>
+        <input id="customAct" type="text" placeholder="Pull the lever, diverting the trolley onto the side track">
+      </div>
+
+      <h3>Exactly what Jev reads</h3>
+      <pre class="state-pre" id="statePre"></pre>
+
+      <div class="run-row">
+        <button id="runBtn" class="btn btn-primary" disabled>Ask Jev for a verdict</button>
+        <span class="run-note" id="runNote">Sign in to run live verdicts — about 0.0001 Pollen each, billed to you.</span>
+      </div>
+    </section>
+
+    <section class="panel" id="verdictPanel">
+      <h2><span class="step">2</span> The verdict</h2>
+
+      <div id="verdictIdle" class="idle">No verdict yet. Load a scenario and ask Jev.</div>
+
+      <div id="verdictBody" hidden>
+        <div class="v-card">
+          <h4>The choice <span class="v-sub">choice · pull vs stay</span></h4>
+          <div class="split-bar" id="choiceBar">
+            <span class="seg seg-intervene" id="segIntervene"></span>
+            <span class="seg seg-refrain" id="segRefrain"></span>
+          </div>
+          <div class="split-labels"><span id="labIntervene"></span><span id="labRefrain"></span></div>
+          <p class="v-line" id="choiceLine"></p>
+        </div>
+
+        <div class="v-card">
+          <h4>The conscience <span class="v-sub">noul · probability of yes</span></h4>
+          <p class="big-num"><span id="noulPct">—</span><span class="unit">% permissible</span></p>
+          <div class="gauge"><span id="noulFill"></span></div>
+          <p class="v-line" id="noulLine"></p>
+        </div>
+
+        <div class="v-card">
+          <h4>The scale <span class="v-sub">score · 0–100 with its legend</span></h4>
+          <p class="big-num"><span id="scoreVal">—</span><span class="unit">/ 100</span></p>
+          <div class="hist" id="scoreHist"></div>
+          <p class="v-line" id="scoreLegend"></p>
+        </div>
+      </div>
+
+      <div id="reversalBox" hidden>
+        <h4>The reversal test <span class="v-sub">same verdict, options presented in the opposite order</span></h4>
+        <table class="mini-table" id="revTable">
+          <thead><tr><th>Run</th><th>Options order</th><th>P(intervene)</th><th>Jev picks</th></tr></thead>
+          <tbody id="revBody"></tbody>
+        </table>
+        <p class="v-line" id="revLine"></p>
+        <p><button id="revBtn" class="btn btn-primary" disabled>Run the reversal test</button></p>
+      </div>
+
+      <div id="errorBox" class="error-box" hidden></div>
+    </section>
+  </div>
+
+  <section class="panel" id="movePanel">
+    <h2><span class="step">3</span> Your move</h2>
+    <div class="move-row">
+      <svg id="trackSvg" viewBox="0 0 640 250" role="img" aria-label="Trolley track diagram">
+        <g class="tracks">
+          <path class="track main" d="M20 190 H 620"/>
+          <path class="track side" d="M230 190 L 320 110 H 620"/>
+        </g>
+        <g id="figMain" class="figures"></g>
+        <g id="figSide" class="figures"></g>
+        <g id="trolley" class="trolley">
+          <rect x="0" y="-16" width="46" height="16" rx="3"/>
+          <circle cx="10" cy="3" r="4"/><circle cx="36" cy="3" r="4"/>
+        </g>
+        <g id="lever" class="lever">
+          <line x1="0" y1="0" x2="0" y2="-26"/>
+          <circle cx="0" cy="-30" r="4"/>
+        </g>
+      </svg>
+      <div class="move-controls">
+        <p class="move-q" id="moveQ">Jev has rendered its verdict. Now you.</p>
+        <button id="pullBtn" class="btn btn-act" disabled>Pull the lever</button>
+        <button id="stayBtn" class="btn btn-act" disabled>Do nothing</button>
+        <p class="outcome" id="outcomeTxt" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <h3>The ledger</h3>
+    <p class="agree" id="agreeStat">No verdicts yet this session.</p>
+    <div class="table-wrap">
+      <table class="mini-table" id="ledgerTable">
+        <thead><tr><th>Situation</th><th>P(intervene)</th><th>Confidence</th><th>Permissible</th><th>Score</th><th>Jev picks</th><th>You</th></tr></thead>
+        <tbody id="ledgerBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap foot-row">
+    <div>
+      <p><strong>Moral Switch</strong> runs entirely in your browser against the <a href="https://gen.pollinations.ai/docs">Pollinations decisions API</a>. Sign-in is the standard <a href="https://github.com/pollinations/pollinations/blob/main/BRING_YOUR_OWN_POLLEN.md">Bring your own Pollen</a> authorization-code flow with PKCE. Read about Jev in Zach Landes' <a href="https://zachlandes.com/trolley-problem/">Jev Meets the Trolley Problem</a>.</p>
+      <p class="fine">No analytics, no accounts, no server: nothing about your dilemma or your key leaves this page except the verdict requests you send.</p>
+    </div>
+    <a href="https://pollinations.ai/?ref=badge">
+      <img src="https://raw.githubusercontent.com/pollinations/pollinations/main/packages/ui/src/brand/badge-made-with.svg" alt="Made with pollinations.ai" width="160">
+    </a>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
